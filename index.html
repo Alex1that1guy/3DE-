@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Home Paint Pro - Smart Mask</title>
+    <title>Home Paint Pro</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
     <style>
         * { box-sizing: border-box; }
@@ -11,102 +11,189 @@
         .page { display: none; width: 100%; max-width: 420px; margin: 0 auto; padding: 20px; min-height: 100vh; }
         .active { display: block; }
         
+        /* UI Components */
+        .card { background: #fff; color: #111; border-radius: 15px; padding: 20px; display: flex; align-items: center; margin-bottom: 15px; cursor: pointer; text-align: left; }
+        .icon-box { font-size: 1.8rem; margin-right: 15px; width: 40px; }
+        .back-btn { background: none; border: 1px solid #555; color: white; padding: 8px 15px; border-radius: 5px; margin-bottom: 20px; cursor: pointer; }
+        
+        /* Editor Styles */
         .video-wrapper { position: relative; width: 100%; border-radius: 12px; overflow: hidden; background: #000; }
-        video, canvas { width: 100%; display: block; }
-        canvas { position: absolute; top: 0; left: 0; pointer-events: none; mix-blend-mode: color; }
+        video { width: 100%; display: block; }
+        canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; mix-blend-mode: multiply; opacity: 0.7; }
         
         .color-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 20px 0; }
         .swatch { height: 50px; border-radius: 8px; cursor: pointer; border: 2px solid transparent; }
         .swatch.selected { border-color: white; transform: scale(1.1); }
-        .action-btn { width: 100%; padding: 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; background: #f39c12; color: white; }
+
+        .action-btn { width: 100%; padding: 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        .primary { background: #f39c12; color: white; }
+        .secondary { background: #3498db; color: white; }
+        .list-item { background: rgba(255,255,255,0.1); border-radius: 10px; padding: 10px; margin-bottom: 15px; text-align: left; }
     </style>
 </head>
 <body>
 
     <div id="menuPage" class="page active">
         <h1 style="margin-top:40px;">🏠 HOME PAINT PRO</h1>
-        <p>Record a room with light-colored walls.</p>
-        <input type="file" accept="video/*" capture="environment" id="vIn" onchange="startSmartEdit(event)">
-        <button class="action-btn" onclick="document.getElementById('vIn').click()">CAPTURE & PAINT</button>
+        <div class="card" onclick="document.getElementById('fileInput').click()">
+            <div class="icon-box">📹</div>
+            <div><h3>Upload New Room</h3><p>Save raw video to storage</p></div>
+        </div>
+        <input type="file" id="fileInput" accept="video/*" capture="environment" style="display:none" onchange="uploadToStorage(event)">
+
+        <div class="card" onclick="showStorage()">
+            <div class="icon-box">📦</div>
+            <div><h3>Video Storage</h3><p>Choose a video to paint</p></div>
+        </div>
+
+        <div class="card" onclick="showProjects()">
+            <div class="icon-box">📁</div>
+            <div><h3>My Projects</h3><p>View edited designs</p></div>
+        </div>
+    </div>
+
+    <div id="storagePage" class="page">
+        <button class="back-btn" onclick="showPage('menuPage')">← Menu</button>
+        <h2>Storage</h2>
+        <div id="storageList"></div>
     </div>
 
     <div id="editPage" class="page">
-        <h2>Smart Wall Paint</h2>
+        <button class="back-btn" onclick="showPage('storagePage')">← Back</button>
         <div class="video-wrapper">
-            <video id="mainVid" loop muted autoplay playsinline></video>
+            <video id="editVid" loop muted autoplay playsinline></video>
             <canvas id="paintCanvas"></canvas>
         </div>
-        
-        <div class="color-grid">
-            <div class="swatch" style="background:#3498db" onclick="setPaint('#3498db')"></div>
-            <div class="swatch" style="background:#e67e22" onclick="setPaint('#e67e22')"></div>
-            <div class="swatch" style="background:#77dd77" onclick="setPaint('#77dd77')"></div>
-            <div class="swatch" style="background:#ffb7c5" onclick="setPaint('#ffb7c5')"></div>
-            <div class="swatch" style="background:#95a5a6" onclick="setPaint('#95a5a6')"></div>
-            <div class="swatch" style="background:#f1c40f" onclick="setPaint('#f1c40f')"></div>
-        </div>
-        <button class="action-btn" onclick="location.reload()">START OVER</button>
+        <div class="color-grid" id="colorGrid"></div>
+        <button class="action-btn primary" onclick="saveProject()">SAVE EDITED PROJECT</button>
+    </div>
+
+    <div id="projectsPage" class="page">
+        <button class="back-btn" onclick="showPage('menuPage')">← Menu</button>
+        <h2>Projects</h2>
+        <div id="projectList"></div>
     </div>
 
     <script>
-        const video = document.getElementById('mainVid');
+        const colors = [
+            {h: '#3498db', r: 52, g: 152, b: 219},
+            {h: '#e67e22', r: 230, g: 126, b: 34},
+            {h: '#2ecc71', r: 46, g: 204, b: 113},
+            {h: '#9b59b6', r: 155, g: 89, b: 182},
+            {h: '#f1c40f', r: 241, g: 196, b: 15},
+            {h: '#e74c3c', r: 231, g: 76, b: 60}
+        ];
+
+        let selectedRGB = {r: 255, g: 255, b: 255};
+        let selectedHex = "#ffffff";
+        let currentVideoBase64 = "";
+
+        const video = document.getElementById('editVid');
         const canvas = document.getElementById('paintCanvas');
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
-        let paintColor = { r: 0, g: 0, b: 0 };
 
-        function startSmartEdit(event) {
-            const file = event.target.files[0];
-            video.src = URL.createObjectURL(file);
-            document.getElementById('menuPage').classList.remove('active');
-            document.getElementById('editPage').classList.add('active');
-            
+        function showPage(id) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+        }
+
+        // --- STORAGE LOGIC ---
+        function uploadToStorage(e) {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            reader.onload = () => {
+                let s = JSON.parse(localStorage.getItem('hpp_s') || '[]');
+                s.push({ id: Date.now(), vid: reader.result });
+                localStorage.setItem('hpp_s', JSON.stringify(s));
+                showStorage();
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function showStorage() {
+            const list = document.getElementById('storageList');
+            list.innerHTML = "";
+            let s = JSON.parse(localStorage.getItem('hpp_s') || '[]');
+            s.forEach(item => {
+                const d = document.createElement('div');
+                d.className = 'list-item';
+                d.innerHTML = `<video src="${item.vid}" style="width:100%"></video>
+                               <button class="action-btn secondary" onclick="openEditor('${item.vid}')">PAINT THIS</button>`;
+                list.appendChild(d);
+            });
+            showPage('storagePage');
+        }
+
+        // --- EDITOR LOGIC ---
+        function openEditor(src) {
+            currentVideoBase64 = src;
+            video.src = src;
+            const grid = document.getElementById('colorGrid');
+            grid.innerHTML = "";
+            colors.forEach(c => {
+                const sw = document.createElement('div');
+                sw.className = 'swatch';
+                sw.style.background = c.h;
+                sw.onclick = () => {
+                    selectedRGB = {r: c.r, g: c.g, b: c.b};
+                    selectedHex = c.h;
+                };
+                grid.appendChild(sw);
+            });
+            showPage('editPage');
             video.onloadedmetadata = () => {
                 canvas.width = video.videoWidth;
                 canvas.height = video.videoHeight;
-                renderPaint();
+                processFrame();
             };
         }
 
-        function setPaint(hex) {
-            // Convert Hex to RGB for the processor
-            const r = parseInt(hex.slice(1, 3), 16);
-            const g = parseInt(hex.slice(3, 5), 16);
-            const b = parseInt(hex.slice(5, 7), 16);
-            paintColor = { r, g, b };
-        }
-
-        function renderPaint() {
+        function processFrame() {
             if (video.paused || video.ended) return;
-
-            // 1. Draw current video frame to canvas
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            
-            // 2. Get pixel data
             const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const data = frame.data;
+            const d = frame.data;
 
-            for (let i = 0; i < data.length; i += 4) {
-                const r = data[i];
-                const g = data[i + 1];
-                const b = data[i + 2];
-
-                // 3. THE MASK LOGIC: 
-                // If the pixel is "bright" (likely a wall), apply color.
-                // If it's "dark" (furniture/shadows), make it transparent.
-                const brightness = (r + g + b) / 3;
-                
-                if (brightness > 120) { // Threshold for "Wall"
-                    data[i] = paintColor.r;
-                    data[i + 1] = paintColor.g;
-                    data[i + 2] = paintColor.b;
-                    data[i + 3] = 180; // Opacity of the paint
+            for (let i = 0; i < d.length; i += 4) {
+                // BRIGHTNESS MASK: Only paint light colors (walls)
+                const bright = (d[i] + d[i+1] + d[i+2]) / 3;
+                if (bright > 80) { // Adjusted threshold to be more sensitive
+                    d[i] = selectedRGB.r;
+                    d[i+1] = selectedRGB.g;
+                    d[i+2] = selectedRGB.b;
+                    d[i+3] = 200; 
                 } else {
-                    data[i + 3] = 0; // Transparent
+                    d[i+3] = 0; // Don't paint dark areas (furniture/shadows)
                 }
             }
-
             ctx.putImageData(frame, 0, 0);
-            requestAnimationFrame(renderPaint);
+            requestAnimationFrame(processFrame);
+        }
+
+        // --- PROJECT LOGIC ---
+        function saveProject() {
+            let p = JSON.parse(localStorage.getItem('hpp_p') || '[]');
+            p.push({ id: Date.now(), vid: currentVideoBase64, col: selectedHex, rgb: selectedRGB });
+            localStorage.setItem('hpp_p', JSON.stringify(p));
+            alert("Project Saved!");
+            showProjects();
+        }
+
+        function showProjects() {
+            const list = document.getElementById('projectList');
+            list.innerHTML = "";
+            let p = JSON.parse(localStorage.getItem('hpp_p') || '[]');
+            p.forEach(item => {
+                const d = document.createElement('div');
+                d.className = 'list-item';
+                // Note: Projects need their own canvas to show the edit, but for simplicity here we use a tint
+                d.innerHTML = `<div style="position:relative">
+                                <video src="${item.vid}" style="width:100%" autoplay loop muted></video>
+                                <div style="position:absolute;top:0;left:0;width:100%;height:100%;background:${item.col};mix-blend-mode:multiply;opacity:0.5;"></div>
+                               </div>`;
+                list.appendChild(d);
+            });
+            showPage('projectsPage');
         }
     </script>
 </body>
