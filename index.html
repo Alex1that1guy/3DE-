@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Home Paint Pro - Wall Logic</title>
+    <title>Home Paint Pro - White Wall Test</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
     <style>
         * { box-sizing: border-box; }
@@ -11,179 +11,110 @@
         .page { display: none; width: 100%; max-width: 420px; margin: 0 auto; padding: 20px; min-height: 100vh; }
         .active { display: block; }
         
-        /* The Secret Sauce: Layering */
         .video-wrapper { position: relative; width: 100%; border-radius: 12px; overflow: hidden; background: #000; }
         video { width: 100%; display: block; }
         canvas { 
             position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
-            pointer-events: none; 
-            mix-blend-mode: soft-light; /* This preserves wall texture better than multiply */
-            opacity: 0.9;
+            pointer-events: none; mix-blend-mode: multiply; opacity: 0.8;
         }
         
-        .card { background: #fff; color: #111; border-radius: 15px; padding: 20px; display: flex; align-items: center; margin-bottom: 15px; cursor: pointer; text-align: left; }
-        .color-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 20px 0; }
+        .controls { background: rgba(255,255,255,0.1); padding: 15px; border-radius: 10px; margin: 15px 0; }
+        .slider { width: 100%; margin: 10px 0; }
+        
+        .color-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px; }
         .swatch { height: 50px; border-radius: 8px; cursor: pointer; border: 2px solid transparent; }
-        .swatch.selected { border-color: white; transform: scale(1.1); }
-        .action-btn { width: 100%; padding: 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 10px; background: #f39c12; color: white; }
+        .action-btn { width: 100%; padding: 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; background: #f39c12; color: white; }
     </style>
 </head>
 <body>
 
     <div id="menuPage" class="page active">
-        <h1>🏠 HOME PAINT PRO</h1>
-        <div class="card" onclick="document.getElementById('fileInput').click()">
-            <div><h3>Step 1: Record Room</h3><p>Upload a video of your walls</p></div>
-        </div>
-        <input type="file" id="fileInput" accept="video/*" capture="environment" style="display:none" onchange="uploadToStorage(event)">
-        
-        <div id="storageSection" style="margin-top:20px;">
-            <h3>Video Storage</h3>
-            <div id="storageList"></div>
-        </div>
+        <h1>🏠 WHITE WALL TEST</h1>
+        <p>Record a room with white or light walls.</p>
+        <input type="file" accept="video/*" capture="environment" id="vIn" onchange="startTest(event)">
+        <button class="action-btn" onclick="document.getElementById('vIn').click()">CHOOSE VIDEO</button>
     </div>
 
     <div id="editPage" class="page">
-        <button onclick="showPage('menuPage')" style="background:none; color:white; border:1px solid #555; padding:5px; margin-bottom:10px;">← Back</button>
         <div class="video-wrapper">
-            <video id="editVid" loop muted autoplay playsinline></video>
+            <video id="testVid" loop muted autoplay playsinline></video>
             <canvas id="paintCanvas"></canvas>
         </div>
-        <div class="color-grid" id="colorGrid"></div>
-        <button class="action-btn" onclick="saveProject()">SAVE TO PROJECTS</button>
-    </div>
 
-    <div id="projectsPage" class="page">
-        <button onclick="showPage('menuPage')" style="background:none; color:white; border:1px solid #555; padding:5px; margin-bottom:10px;">← Back</button>
-        <h2>My Projects</h2>
-        <div id="projectList"></div>
+        <div class="controls">
+            <label>Wall Sensitivity (Higher = more white)</label>
+            <input type="range" id="threshold" class="slider" min="50" max="230" value="180">
+            <p id="valDisplay">Threshold: 180</p>
+        </div>
+        
+        <div class="color-grid" id="colorGrid"></div>
+        <button class="action-btn" onclick="location.reload()">TRY NEW VIDEO</button>
     </div>
 
     <script>
         const colors = [
             {h: '#3498db', r: 52, g: 152, b: 219}, {h: '#e67e22', r: 230, g: 126, b: 34},
-            {h: '#2ecc71', r: 46, g: 204, b: 113}, {h: '#f1c40f', r: 241, g: 196, b: 15},
-            {h: '#e74c3c', r: 231, g: 76, b: 60}, {h: '#95a5a6', r: 149, g: 165, b: 166}
+            {h: '#2ecc71', r: 46, g: 204, b: 113}, {h: '#f1c40f', r: 241, g: 196, b: 15}
         ];
 
-        let selectedRGB = null;
-        let selectedHex = "";
-        let currentVideoBase64 = "";
-
-        const video = document.getElementById('editVid');
+        let selectedRGB = {r: 52, g: 152, b: 219};
+        const video = document.getElementById('testVid');
         const canvas = document.getElementById('paintCanvas');
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        const thresholdSlider = document.getElementById('threshold');
 
-        function showPage(id) {
-            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
-            document.getElementById(id).classList.add('active');
-        }
-
-        function uploadToStorage(e) {
-            const file = e.target.files[0];
-            const reader = new FileReader();
-            reader.onload = () => {
-                let s = JSON.parse(localStorage.getItem('hpp_s') || '[]');
-                s.push({ id: Date.now(), vid: reader.result });
-                localStorage.setItem('hpp_s', JSON.stringify(s));
-                renderStorage();
-            };
-            reader.readAsDataURL(file);
-        }
-
-        function renderStorage() {
-            const list = document.getElementById('storageList');
-            list.innerHTML = "";
-            let s = JSON.parse(localStorage.getItem('hpp_s') || '[]');
-            s.forEach(item => {
-                const d = document.createElement('div');
-                d.style.marginBottom = "10px";
-                d.innerHTML = `<video src="${item.vid}" style="width:100%; border-radius:10px;"></video>
-                               <button class="action-btn" onclick="openEditor('${item.vid}')">PAINT THIS</button>`;
-                list.appendChild(d);
-            });
-        }
-
-        function openEditor(src) {
-            currentVideoBase64 = src;
-            video.src = src;
+        function startTest(event) {
+            const file = event.target.files[0];
+            video.src = URL.createObjectURL(file);
+            document.getElementById('menuPage').classList.remove('active');
+            document.getElementById('editPage').classList.add('active');
+            
+            // Generate Swatches
             const grid = document.getElementById('colorGrid');
-            grid.innerHTML = "";
             colors.forEach(c => {
                 const sw = document.createElement('div');
-                sw.className = 'swatch'; sw.style.background = c.h;
-                sw.onclick = () => { 
-                    selectedRGB = c; 
-                    selectedHex = c.h;
-                    document.querySelectorAll('.swatch').forEach(s => s.style.borderColor = "transparent");
-                    sw.style.borderColor = "white";
-                };
+                sw.className = 'swatch'; sw.style.backgroundColor = c.h;
+                sw.onclick = () => { selectedRGB = c; };
                 grid.appendChild(sw);
             });
-            showPage('editPage');
+
             video.onloadedmetadata = () => {
                 canvas.width = video.videoWidth;
                 canvas.height = video.videoHeight;
-                processFrame();
+                process();
             };
         }
 
-        function processFrame() {
-            if (video.paused || video.ended || !selectedRGB) {
-                requestAnimationFrame(processFrame);
-                return;
-            }
+        function process() {
+            if (video.paused || video.ended) return;
             
             ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
             const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
             const d = frame.data;
+            const threshold = parseInt(thresholdSlider.value);
+            document.getElementById('valDisplay').innerText = "Threshold: " + threshold;
 
             for (let i = 0; i < d.length; i += 4) {
                 const r = d[i], g = d[i+1], b = d[i+2];
                 
-                // SATURATION CHECK: Walls are usually desaturated (grey/white/beige)
-                // We find the difference between the strongest and weakest color in the pixel
-                const max = Math.max(r, g, b);
-                const min = Math.min(r, g, b);
-                const saturation = (max === 0) ? 0 : (max - min) / max;
+                // WHITE DETECTION: 
+                // 1. All channels must be above the threshold.
+                // 2. The colors must be close to each other (not a bright blue or red).
+                const isWhite = (r > threshold && g > threshold && b > threshold);
+                const isNeutral = (Math.abs(r - g) < 30 && Math.abs(g - b) < 30);
 
-                // If saturation is low (looks like a neutral wall) and it's bright enough
-                if (saturation < 0.3 && max > 60) {
+                if (isWhite && isNeutral) {
                     d[i] = selectedRGB.r;
                     d[i+1] = selectedRGB.g;
                     d[i+2] = selectedRGB.b;
-                    d[i+3] = 255; // Full strength, blend-mode handles the rest
+                    d[i+3] = 255; 
                 } else {
-                    d[i+3] = 0; // Transparent (don't paint people or colorful furniture)
+                    d[i+3] = 0; 
                 }
             }
             ctx.putImageData(frame, 0, 0);
-            requestAnimationFrame(processFrame);
+            requestAnimationFrame(process);
         }
-
-        function saveProject() {
-            let p = JSON.parse(localStorage.getItem('hpp_p') || '[]');
-            p.push({ id: Date.now(), vid: currentVideoBase64, col: selectedHex });
-            localStorage.setItem('hpp_p', JSON.stringify(p));
-            alert("Saved to Projects!");
-            renderProjects();
-            showPage('projectsPage');
-        }
-
-        function renderProjects() {
-            const list = document.getElementById('projectList');
-            list.innerHTML = "";
-            let p = JSON.parse(localStorage.getItem('hpp_p') || '[]');
-            p.forEach(item => {
-                list.innerHTML += `<div style="position:relative; margin-bottom:15px;">
-                    <video src="${item.vid}" style="width:100%; border-radius:10px;" autoplay loop muted></video>
-                    <div style="position:absolute;top:0;left:0;width:100%;height:100%;background:${item.col};mix-blend-mode:soft-light;opacity:0.8;border-radius:10px;"></div>
-                </div>`;
-            });
-        }
-
-        renderStorage();
-        renderProjects();
     </script>
 </body>
 </html>
