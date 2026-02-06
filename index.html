@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Home Paint Pro</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;700&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; }
+        
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: 'Inter', sans-serif;
+            /* Using a high-quality interior background */
+            background: linear-gradient(rgba(12, 24, 45, 0.85), rgba(12, 24, 45, 0.85)), 
+                        url('https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?q=80&w=2000') no-repeat center center fixed;
+            background-size: cover;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 420px;
+            padding: 20px;
+            text-align: center;
+        }
+
+        .date-header {
+            font-size: 0.85rem;
+            letter-spacing: 2px;
+            opacity: 0.8;
+            margin-bottom: 30px;
+            text-transform: uppercase;
+        }
+
+        .logo-section {
+            margin-bottom: 50px;
+        }
+
+        .home-icon {
+            font-size: 3.5rem;
+            color: #f39c12; /* That warm orange-gold color */
+            margin-bottom: 10px;
+        }
+
+        h1 {
+            font-size: 2.2rem;
+            margin: 0;
+            letter-spacing: 1px;
+            font-weight: 700;
+        }
+
+        .tagline {
+            font-size: 1rem;
+            color: #bdc3c7;
+            margin-top: 8px;
+            font-weight: 300;
+        }
+
+        /* The Button/Cards Area */
+        .menu-options {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+
+        .card {
+            background: #ffffff;
+            border-radius: 15px;
+            padding: 22px;
+            display: flex;
+            align-items: center;
+            text-decoration: none;
+            transition: transform 0.2s, background-color 0.2s;
+            cursor: pointer;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+        }
+
+        .card:hover {
+            transform: translateY(-3px);
+            background-color: #f8f9fa;
+        }
+
+        .card:active {
+            transform: scale(0.98);
+        }
+
+        .icon-box {
+            font-size: 1.8rem;
+            margin-right: 20px;
+            width: 45px;
+            display: flex;
+            justify-content: center;
+        }
+
+        .text-box {
+            text-align: left;
+        }
+
+        .text-box h3 {
+            margin: 0;
+            color: #1a1a1a;
+            font-size: 1.1rem;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .text-box p {
+            margin: 4px 0 0 0;
+            color: #7f8c8d;
+            font-size: 0.85rem;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="date-header" id="date">WEDNESDAY, FEBRUARY 4</div>
+
+        <div class="logo-section">
+            <div class="home-icon">🏠</div>
+            <h1>HOME PAINT PRO</h1>
+            <div class="tagline">Visualize Your World, One Wall At A Time.</div>
+        </div>
+
+        <div class="menu-options">
+            <a href="#" class="card">
+                <div class="icon-box">📹</div>
+                <div class="text-box">
+                    <h3>Start Visualizing</h3>
+                    <p>Upload a video of your room</p>
+                </div>
+            </a>
+
+            <a href="#" class="card">
+                <div class="icon-box">🎨</div>
+                <div class="text-box">
+                    <h3>Browse Colors</h3>
+                    <p>Explore thousands of your hues</p>
+                </div>
+            </a>
+
+            <a href="#" class="card">
+                <div class="icon-box">📁</div>
+                <div class="text-box">
+                    <h3>My Projects</h3>
+                    <p>View saved designs</p>
+                </div>
+            </a>
+        </div>
+    </div>
+
+    <script>
+        // Logic to update the date automatically
+        const options = { weekday: 'long', month: 'long', day: 'numeric' };
+        const today = new Date();
+        document.getElementById('date').innerText = today.toLocaleDateString('en-US', options).toUpperCase();
+    </script>
+
+</body>
+</html>
