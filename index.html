@@ -4,93 +4,171 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Home Paint Pro</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
     <style>
         * { box-sizing: border-box; }
-        body {
-            margin: 0; padding: 0;
-            font-family: 'Inter', sans-serif;
-            background: #0c182d;
-            color: white;
-            overflow-x: hidden;
-        }
-
-        /* PAGE MANAGEMENT */
-        .page { display: none; width: 100%; max-width: 420px; margin: 0 auto; padding: 20px; text-align: center; min-height: 100vh; }
+        body { margin: 0; font-family: 'Inter', sans-serif; background: #0c182d; color: white; text-align: center; }
+        .page { display: none; width: 100%; max-width: 420px; margin: 0 auto; padding: 20px; min-height: 100vh; }
         .active { display: block; }
-
-        /* HEADER & UI */
-        .home-icon { font-size: 3rem; color: #f39c12; margin-top: 40px; }
-        .tagline { color: #bdc3c7; margin-bottom: 40px; font-weight: 300; }
-        .back-btn { background: none; border: 1px solid white; color: white; padding: 10px 20px; border-radius: 5px; margin-bottom: 20px; cursor: pointer; }
-
-        /* CARDS */
-        .card { background: #fff; color: #1a1a1a; border-radius: 15px; padding: 20px; display: flex; align-items: center; margin-bottom: 15px; cursor: pointer; transition: 0.2s; }
-        .card:active { transform: scale(0.98); }
-        .icon-box { font-size: 1.8rem; margin-right: 20px; width: 40px; }
-        .text-box { text-align: left; }
-        .text-box h3 { margin: 0; font-size: 1rem; text-transform: uppercase; }
-        .text-box p { margin: 2px 0 0; color: #7f8c8d; font-size: 0.8rem; }
-
-        /* COLORS */
-        .color-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin: 20px 0; }
-        .swatch { height: 60px; border-radius: 10px; cursor: pointer; border: 3px solid transparent; position: relative; }
+        
+        /* UI Components */
+        .card { background: #fff; color: #111; border-radius: 15px; padding: 20px; display: flex; align-items: center; margin-bottom: 15px; cursor: pointer; text-align: left; }
+        .icon-box { font-size: 1.8rem; margin-right: 15px; width: 40px; }
+        .back-btn { background: none; border: 1px solid #555; color: white; padding: 8px 15px; border-radius: 5px; margin-bottom: 20px; cursor: pointer; }
+        
+        /* Color Swatches */
+        .color-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px; }
+        .swatch { height: 50px; border-radius: 8px; cursor: pointer; border: 2px solid transparent; }
         .swatch.selected { border-color: white; transform: scale(1.1); }
 
-        /* VIDEO PREVIEW */
-        #videoContainer { position: relative; width: 100%; border-radius: 15px; overflow: hidden; background: #000; margin-top: 20px; }
+        /* Video Display */
+        .video-wrapper { position: relative; width: 100%; border-radius: 12px; overflow: hidden; background: #000; }
         video { width: 100%; display: block; }
-        .overlay-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; mix-blend-mode: multiply; pointer-events: none; opacity: 0.5; }
+        .paint-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; mix-blend-mode: multiply; opacity: 0.5; pointer-events: none; }
         
-        .save-btn { width: 100%; padding: 15px; background: #3498db; border: none; color: white; border-radius: 8px; font-weight: bold; margin-top: 15px; }
-        .project-item { background: rgba(255,255,255,0.1); border-radius: 10px; padding: 10px; margin-bottom: 20px; text-align: left; }
+        /* Buttons */
+        .action-btn { width: 100%; padding: 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 10px; }
+        .primary { background: #f39c12; color: white; }
+        .secondary { background: #3498db; color: white; }
+        
+        .list-item { background: rgba(255,255,255,0.1); border-radius: 10px; padding: 10px; margin-bottom: 15px; text-align: left; }
     </style>
 </head>
 <body>
 
     <div id="menuPage" class="page active">
-        <div class="home-icon">🏠</div>
-        <h1>HOME PAINT PRO</h1>
-        <p class="tagline">Visualize Your World, One Wall At A Time.</p>
-        
-        <div class="card" onclick="showPage('selectColorPage')">
+        <h1 style="margin-top:40px;">🏠 HOME PAINT PRO</h1>
+        <p style="color:#bdc3c7;">Visualize Your World</p>
+
+        <div class="card" onclick="document.getElementById('fileInput').click()">
             <div class="icon-box">📹</div>
-            <div class="text-box"><h3>Start Visualizing</h3><p>Choose color & record room</p></div>
+            <div><h3>Upload New Room</h3><p>Save a raw video to storage</p></div>
+        </div>
+        <input type="file" id="fileInput" accept="video/*" capture="environment" style="display:none" onchange="uploadToStorage(event)">
+
+        <div class="card" onclick="showStorage()">
+            <div class="icon-box">📦</div>
+            <div><h3>Video Storage</h3><p>Select a video to edit</p></div>
         </div>
 
-        <div class="card" onclick="showPage('colorPage')">
-            <div class="icon-box">🎨</div>
-            <div class="text-box"><h3>Browse Colors</h3><p>View our available hues</p></div>
-        </div>
-
-        <div class="card" onclick="loadProjects()">
+        <div class="card" onclick="showProjects()">
             <div class="icon-box">📁</div>
-            <div class="text-box"><h3>My Projects</h3><p>View saved designs</p></div>
+            <div><h3>My Projects</h3><p>View your edited designs</p></div>
         </div>
     </div>
 
-    <div id="selectColorPage" class="page">
-        <button class="back-btn" onclick="showPage('menuPage')">← Cancel</button>
-        <h2>Step 1: Pick a Paint</h2>
-        <div class="color-grid" id="visualizeSwatches"></div>
-        <button id="nextBtn" disabled onclick="showPage('uploadPage')" style="width:100%; padding:15px; background:#f39c12; border:none; color:white; border-radius:8px; font-weight:bold; opacity:0.5;">NEXT: RECORD ROOM</button>
+    <div id="storagePage" class="page">
+        <button class="back-btn" onclick="showPage('menuPage')">← Menu</button>
+        <h2>Video Storage</h2>
+        <div id="storageList"></div>
     </div>
 
-    <div id="uploadPage" class="page">
-        <button class="back-btn" onclick="showPage('selectColorPage')">← Change Color</button>
-        <h2>Step 2: Video</h2>
-        <input type="file" accept="video/*" capture="environment" id="videoInput" style="display:none" onchange="handleVideo(event)">
-        <button onclick="document.getElementById('videoInput').click()" style="width:100%; padding:20px; background:#2ecc71; border:none; color:white; border-radius:8px; font-weight:bold;">OPEN CAMERA</button>
-    </div>
-
-    <div id="previewPage" class="page">
-        <button class="back-btn" onclick="showPage('menuPage')">← Home</button>
-        <h2>Preview</h2>
-        <div id="videoContainer">
-            <video id="outputVideo" controls autoplay loop muted></video>
-            <div id="colorOverlay" class="overlay-layer"></div>
+    <div id="editPage" class="page">
+        <button class="back-btn" onclick="showPage('storagePage')">← Back</button>
+        <h2>Edit Wall Color</h2>
+        <div class="video-wrapper">
+            <video id="editVideo" loop muted autoplay></video>
+            <div id="editOverlay" class="paint-overlay"></div>
         </div>
-        <button class="save-btn" onclick="saveCurrentProject()">💾 SAVE TO PROJECTS</button>
+        <p>Pick a color:</p>
+        <div class="color-grid" id="editColors"></div>
+        <button class="action-btn primary" onclick="saveToProjects()">SAVE EDITED PROJECT</button>
     </div>
 
-    <div id="colorPage" class="page">
+    <div id="projectsPage" class="page">
+        <button class="back-btn" onclick="showPage('menuPage')">← Menu</button>
+        <h2>My Projects</h2>
+        <div id="projectList"></div>
+    </div>
+
+    <script>
+        let currentRawVideo = "";
+        let selectedColor = "";
+        const colors = ['#3498db', '#77dd77', '#e67e22', '#95a5a6', '#ffb7c5', '#2c3e50'];
+
+        function showPage(id) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
+        }
+
+        // 1. UPLOAD & SAVE TO STORAGE
+        function uploadToStorage(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = () => {
+                let storage = JSON.parse(localStorage.getItem('hpp_storage') || '[]');
+                storage.push({ id: Date.now(), video: reader.result, date: new Date().toLocaleString() });
+                localStorage.setItem('hpp_storage', JSON.stringify(storage));
+                alert("Video saved to Storage!");
+                showStorage();
+            };
+        }
+
+        // 2. SHOW STORAGE & SELECT FOR EDIT
+        function showStorage() {
+            const list = document.getElementById('storageList');
+            list.innerHTML = "";
+            let storage = JSON.parse(localStorage.getItem('hpp_storage') || '[]');
+            storage.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'list-item';
+                div.innerHTML = `<p>Recorded: ${item.date}</p><video src="${item.video}" style="width:100%; border-radius:5px;"></video>
+                                <button class="action-btn secondary" onclick="startEdit('${item.video}')">EDIT THIS VIDEO</button>`;
+                list.appendChild(div);
+            });
+            showPage('storagePage');
+        }
+
+        // 3. START EDITING
+        function startEdit(videoSrc) {
+            currentRawVideo = videoSrc;
+            document.getElementById('editVideo').src = videoSrc;
+            const colorGrid = document.getElementById('editColors');
+            colorGrid.innerHTML = "";
+            colors.forEach(c => {
+                const s = document.createElement('div');
+                s.className = 'swatch';
+                s.style.background = c;
+                s.onclick = () => {
+                    selectedColor = c;
+                    document.getElementById('editOverlay').style.background = c;
+                    document.querySelectorAll('.swatch').forEach(sw => sw.classList.remove('selected'));
+                    s.classList.add('selected');
+                };
+                colorGrid.appendChild(s);
+            });
+            showPage('editPage');
+        }
+
+        // 4. SAVE TO PROJECTS
+        function saveToProjects() {
+            if (!selectedColor) return alert("Select a color first!");
+            let projects = JSON.parse(localStorage.getItem('hpp_projects') || '[]');
+            projects.push({ id: Date.now(), video: currentRawVideo, color: selectedColor, date: new Date().toLocaleString() });
+            localStorage.setItem('hpp_projects', JSON.stringify(projects));
+            alert("Project saved!");
+            showProjects();
+        }
+
+        // 5. SHOW PROJECTS
+        function showProjects() {
+            const list = document.getElementById('projectList');
+            list.innerHTML = "";
+            let projects = JSON.parse(localStorage.getItem('hpp_projects') || '[]');
+            projects.forEach(p => {
+                const div = document.createElement('div');
+                div.className = 'list-item';
+                div.innerHTML = `<p>Edited: ${p.date}</p>
+                                <div class="video-wrapper">
+                                    <video src="${p.video}" loop muted autoplay></video>
+                                    <div class="paint-overlay" style="background:${p.color}; display:block;"></div>
+                                </div>`;
+                list.appendChild(div);
+            });
+            showPage('projectsPage');
+        }
+    </script>
+</body>
+</html>
