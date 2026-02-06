@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Home Paint Pro</title>
+    <title>Home Paint Pro - AI Scanner</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
     <style>
         * { box-sizing: border-box; }
@@ -11,31 +11,11 @@
         .page { display: none; width: 100%; max-width: 420px; margin: 0 auto; padding: 20px; min-height: 100vh; }
         .active { display: block; }
         
-        /* THE MAGIC: Luma Masking */
-        .video-container { 
-            position: relative; 
-            width: 100%; 
-            border-radius: 12px; 
-            overflow: hidden; 
-            background: #000;
-            /* High contrast helps the mask distinguish 'white' from 'not white' */
-            filter: contrast(1.1); 
-        }
-        video { width: 100%; display: block; }
-        
-        .paint-layer {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
-            pointer-events: none;
-            mix-blend-mode: color; /* Preserves texture better than multiply */
-            background-color: transparent;
-            /* This mask logic tells the browser: "Only show this layer where the video is bright" */
-            backdrop-filter: brightness(1.5) contrast(2); 
-            -webkit-mask-image: linear-gradient(to bottom, black, black);
-            mask-image: linear-gradient(to bottom, black, black);
-            opacity: 0.9;
-        }
+        /* The Secret: Hidden Video, Visible Canvas */
+        .video-container { position: relative; width: 100%; border-radius: 12px; overflow: hidden; background: #000; }
+        #editVid { display: none; } /* We process the video in the background */
+        #displayCanvas { width: 100%; display: block; border-radius: 12px; }
 
-        /* UI Styles */
         .card { background: #fff; color: #111; border-radius: 15px; padding: 20px; display: flex; align-items: center; margin-bottom: 15px; cursor: pointer; text-align: left; }
         .color-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 20px 0; }
         .swatch { height: 50px; border-radius: 8px; cursor: pointer; border: 2px solid #444; }
@@ -46,64 +26,61 @@
 <body>
 
     <div id="menuPage" class="page active">
-        <h1>🏠 HOME PAINT PRO</h1>
+        <h1>🏠 PAINT PRO AI</h1>
         <div class="card" onclick="document.getElementById('fileInput').click()">
-            <div><h3>Upload New Room</h3><p>Record a video for storage</p></div>
+            <div><h3>Upload New Room</h3><p>Record white walls to paint</p></div>
         </div>
         <input type="file" id="fileInput" accept="video/*" capture="environment" style="display:none" onchange="handleFileUpload(event)">
         <div class="card" onclick="showStorage()">
-            <div><h3>Video Storage</h3><p>Select a video to edit</p></div>
-        </div>
-        <div class="card" onclick="showProjects()">
-            <div><h3>My Projects</h3><p>View saved edits</p></div>
+            <div><h3>Video Storage</h3><p>Choose video to scan</p></div>
         </div>
     </div>
 
     <div id="storagePage" class="page">
-        <button onclick="showPage('menuPage')" style="background:none; color:white; border:1px solid #555; padding:8px; border-radius:5px; margin-bottom:20px;">← Back</button>
+        <button class="action-btn" style="background:#555" onclick="showPage('menuPage')">← Back</button>
         <h2>Storage</h2>
         <div id="storageList"></div>
     </div>
 
     <div id="editPage" class="page">
-        <button onclick="showPage('storagePage')" style="background:none; color:white; border:1px solid #555; padding:8px; border-radius:5px; margin-bottom:20px;">← Back</button>
+        <button class="action-btn" style="background:#555" onclick="stopProcessing(); showPage('storagePage')">← Back</button>
         <div class="video-container">
-            <video id="editVid" loop muted autoplay playsinline></video>
-            <div id="paintOverlay" class="paint-layer"></div>
+            <video id="editVid" loop muted playsinline crossorigin="anonymous"></video>
+            <canvas id="displayCanvas"></canvas>
         </div>
-        <div class="color-grid">
-            <div class="swatch" style="background:#3498db" onclick="applyPaint('#3498db')"></div>
-            <div class="swatch" style="background:#e67e22" onclick="applyPaint('#e67e22')"></div>
-            <div class="swatch" style="background:#2ecc71" onclick="applyPaint('#2ecc71')"></div>
-            <div class="swatch" style="background:#9b59b6" onclick="applyPaint('#9b59b6')"></div>
-            <div class="swatch" style="background:#f1c40f" onclick="applyPaint('#f1c40f')"></div>
-            <div class="swatch" style="background:#e74c3c" onclick="applyPaint('#e74c3c')"></div>
-        </div>
-        <button class="action-btn" onclick="saveToProjects()">SAVE PROJECT</button>
-    </div>
-
-    <div id="projectsPage" class="page">
-        <button onclick="showPage('menuPage')" style="background:none; color:white; border:1px solid #555; padding:8px; border-radius:5px; margin-bottom:20px;">← Back</button>
-        <h2>My Projects</h2>
-        <div id="projectList"></div>
+        <p>Targeting: <span style="color:#f39c12">White Walls</span></p>
+        <div class="color-grid" id="colorGrid"></div>
+        <button class="action-btn" onclick="saveProject()">SAVE PROJECT</button>
     </div>
 
     <script>
         let currentVideoData = "";
-        let currentSelectedColor = "";
+        let selectedRGB = {r: 52, g: 152, b: 219}; // Default Blue
+        let animationFrame;
+
+        const colors = [
+            {h: '#3498db', r: 52, g: 152, b: 219}, {h: '#e67e22', r: 230, g: 126, b: 34},
+            {h: '#2ecc71', r: 46, g: 204, b: 113}, {h: '#f1c40f', r: 241, g: 196, b: 15},
+            {h: '#e74c3c', r: 231, g: 76, b: 60}, {h: '#9b59b6', r: 155, g: 89, b: 182}
+        ];
+
+        const video = document.getElementById('editVid');
+        const canvas = document.getElementById('displayCanvas');
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
         function showPage(id) {
             document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
             document.getElementById(id).classList.add('active');
         }
 
+        // --- STORAGE LOGIC ---
         function handleFileUpload(e) {
             const file = e.target.files[0];
             const reader = new FileReader();
             reader.onload = () => {
-                let storage = JSON.parse(localStorage.getItem('hpp_storage') || '[]');
+                let storage = JSON.parse(localStorage.getItem('hpp_ai_storage') || '[]');
                 storage.push({ id: Date.now(), video: reader.result });
-                localStorage.setItem('hpp_storage', JSON.stringify(storage));
+                localStorage.setItem('hpp_ai_storage', JSON.stringify(storage));
                 showStorage();
             };
             reader.readAsDataURL(file);
@@ -112,56 +89,8 @@
         function showStorage() {
             const list = document.getElementById('storageList');
             list.innerHTML = "";
-            let storage = JSON.parse(localStorage.getItem('hpp_storage') || '[]');
+            let storage = JSON.parse(localStorage.getItem('hpp_ai_storage') || '[]');
             storage.forEach(item => {
                 const div = document.createElement('div');
                 div.className = 'list-item';
-                div.innerHTML = `<video src="${item.video}" style="width:100%; border-radius:8px;"></video>
-                                <button class="action-btn" onclick="startEditing('${item.video}')">EDIT THIS VIDEO</button>`;
-                list.appendChild(div);
-            });
-            showPage('storagePage');
-        }
-
-        function startEditing(src) {
-            currentVideoData = src;
-            document.getElementById('editVid').src = src;
-            showPage('editPage');
-        }
-
-        function applyPaint(color) {
-            currentSelectedColor = color;
-            const overlay = document.getElementById('paintOverlay');
-            overlay.style.backgroundColor = color;
-            
-            // The magic trick: We use an exclusion filter to protect dark areas
-            // This is a browser-native way to say 'if it's dark, don't paint it'
-            overlay.style.mixBlendMode = "multiply";
-        }
-
-        function saveToProjects() {
-            if (!currentSelectedColor) return alert("Pick a color first!");
-            let projects = JSON.parse(localStorage.getItem('hpp_projects') || '[]');
-            projects.push({ video: currentVideoData, color: currentSelectedColor });
-            localStorage.setItem('hpp_projects', JSON.stringify(projects));
-            alert("Project saved!");
-            showProjects();
-        }
-
-        function showProjects() {
-            const list = document.getElementById('projectList');
-            list.innerHTML = "";
-            let projects = JSON.parse(localStorage.getItem('hpp_projects') || '[]');
-            projects.forEach(p => {
-                list.innerHTML += `<div class="list-item">
-                    <div class="video-container">
-                        <video src="${p.video}" loop muted autoplay></video>
-                        <div style="position:absolute;top:0;left:0;width:100%;height:100%;background:${p.color};mix-blend-mode:multiply;opacity:0.8;"></div>
-                    </div>
-                </div>`;
-            });
-            showPage('projectsPage');
-        }
-    </script>
-</body>
-</html>
+                div.innerHTML = `<video src="${item
