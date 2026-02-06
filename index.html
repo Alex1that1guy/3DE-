@@ -3,94 +3,165 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Home Paint Pro - AI Scanner</title>
+    <title>Home Paint Pro AI</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
     <style>
         * { box-sizing: border-box; }
         body { margin: 0; font-family: 'Inter', sans-serif; background: #0c182d; color: white; text-align: center; }
+        
+        /* Navigation System */
         .page { display: none; width: 100%; max-width: 420px; margin: 0 auto; padding: 20px; min-height: 100vh; }
         .active { display: block; }
         
-        /* The Secret: Hidden Video, Visible Canvas */
-        .video-container { position: relative; width: 100%; border-radius: 12px; overflow: hidden; background: #000; }
-        #editVid { display: none; } /* We process the video in the background */
+        /* UI Elements */
+        .card { background: #fff; color: #111; border-radius: 15px; padding: 20px; display: flex; align-items: center; margin-bottom: 15px; cursor: pointer; text-align: left; }
+        .icon-box { font-size: 1.8rem; margin-right: 15px; }
+        .action-btn { width: 100%; padding: 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; background: #f39c12; color: white; margin-top: 10px; }
+        .back-btn { background: #555; color: white; border: none; padding: 10px; border-radius: 5px; margin-bottom: 15px; cursor: pointer; width: 100%; }
+
+        /* The AI Scanner Canvas */
+        .video-container { position: relative; width: 100%; border-radius: 12px; overflow: hidden; background: #000; margin-bottom: 15px; }
+        #editVid { display: none; } /* Hidden: processed by AI */
         #displayCanvas { width: 100%; display: block; border-radius: 12px; }
 
-        .card { background: #fff; color: #111; border-radius: 15px; padding: 20px; display: flex; align-items: center; margin-bottom: 15px; cursor: pointer; text-align: left; }
-        .color-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 20px 0; }
+        /* Color Selection */
+        .color-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 15px; }
         .swatch { height: 50px; border-radius: 8px; cursor: pointer; border: 2px solid #444; }
-        .action-btn { width: 100%; padding: 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; background: #f39c12; color: white; margin-top: 10px; }
-        .list-item { background: rgba(255,255,255,0.1); border-radius: 10px; padding: 10px; margin-bottom: 15px; }
+        .list-item { background: rgba(255,255,255,0.1); border-radius: 10px; padding: 15px; margin-bottom: 15px; }
     </style>
 </head>
 <body>
 
     <div id="menuPage" class="page active">
-        <h1>🏠 PAINT PRO AI</h1>
+        <h1 style="margin-top:40px;">🏠 PAINT PRO AI</h1>
+        <p style="color:#bdc3c7">Target: White Walls</p>
+
         <div class="card" onclick="document.getElementById('fileInput').click()">
-            <div><h3>Upload New Room</h3><p>Record white walls to paint</p></div>
+            <div class="icon-box">📹</div>
+            <div><h3>Upload New Room</h3><p>Record or select a video</p></div>
         </div>
-        <input type="file" id="fileInput" accept="video/*" capture="environment" style="display:none" onchange="handleFileUpload(event)">
-        <div class="card" onclick="showStorage()">
-            <div><h3>Video Storage</h3><p>Choose video to scan</p></div>
+        <input type="file" id="fileInput" accept="video/*" capture="environment" style="display:none" onchange="saveToStorage(event)">
+
+        <div class="card" onclick="openStoragePage()">
+            <div class="icon-box">📦</div>
+            <div><h3>Video Storage</h3><p>View & edit your clips</p></div>
         </div>
     </div>
 
     <div id="storagePage" class="page">
-        <button class="action-btn" style="background:#555" onclick="showPage('menuPage')">← Back</button>
-        <h2>Storage</h2>
+        <button class="back-btn" onclick="showPage('menuPage')">← Back to Menu</button>
+        <h2>Your Storage</h2>
         <div id="storageList"></div>
     </div>
 
     <div id="editPage" class="page">
-        <button class="action-btn" style="background:#555" onclick="stopProcessing(); showPage('storagePage')">← Back</button>
+        <button class="back-btn" onclick="stopAI(); showPage('storagePage')">← Cancel Edit</button>
         <div class="video-container">
             <video id="editVid" loop muted playsinline crossorigin="anonymous"></video>
             <canvas id="displayCanvas"></canvas>
         </div>
-        <p>Targeting: <span style="color:#f39c12">White Walls</span></p>
+        <p>Select Paint Color:</p>
         <div class="color-grid" id="colorGrid"></div>
-        <button class="action-btn" onclick="saveProject()">SAVE PROJECT</button>
+        <button class="action-btn" onclick="alert('Project saved in browser memory!')">💾 SAVE PROJECT</button>
     </div>
 
     <script>
-        let currentVideoData = "";
-        let selectedRGB = {r: 52, g: 152, b: 219}; // Default Blue
-        let animationFrame;
-
+        // Data and State
         const colors = [
             {h: '#3498db', r: 52, g: 152, b: 219}, {h: '#e67e22', r: 230, g: 126, b: 34},
             {h: '#2ecc71', r: 46, g: 204, b: 113}, {h: '#f1c40f', r: 241, g: 196, b: 15},
             {h: '#e74c3c', r: 231, g: 76, b: 60}, {h: '#9b59b6', r: 155, g: 89, b: 182}
         ];
+        let selectedRGB = {r: 52, g: 152, b: 219};
+        let animFrame;
 
         const video = document.getElementById('editVid');
         const canvas = document.getElementById('displayCanvas');
         const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
+        // NAVIGATION
         function showPage(id) {
             document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
             document.getElementById(id).classList.add('active');
         }
 
-        // --- STORAGE LOGIC ---
-        function handleFileUpload(e) {
+        // STORAGE LOGIC
+        function saveToStorage(e) {
             const file = e.target.files[0];
+            if (!file) return;
             const reader = new FileReader();
             reader.onload = () => {
-                let storage = JSON.parse(localStorage.getItem('hpp_ai_storage') || '[]');
-                storage.push({ id: Date.now(), video: reader.result });
-                localStorage.setItem('hpp_ai_storage', JSON.stringify(storage));
-                showStorage();
+                let storage = JSON.parse(localStorage.getItem('hpp_videos') || '[]');
+                storage.push({ id: Date.now(), data: reader.result });
+                localStorage.setItem('hpp_videos', JSON.stringify(storage));
+                alert("Video saved to Storage!");
+                openStoragePage();
             };
             reader.readAsDataURL(file);
         }
 
-        function showStorage() {
+        function openStoragePage() {
             const list = document.getElementById('storageList');
             list.innerHTML = "";
-            let storage = JSON.parse(localStorage.getItem('hpp_ai_storage') || '[]');
-            storage.forEach(item => {
-                const div = document.createElement('div');
-                div.className = 'list-item';
-                div.innerHTML = `<video src="${item
+            let storage = JSON.parse(localStorage.getItem('hpp_videos') || '[]');
+            
+            if (storage.length === 0) {
+                list.innerHTML = "<p style='margin-top:50px; opacity:0.5;'>No videos saved yet.</p>";
+            } else {
+                storage.forEach(item => {
+                    const div = document.createElement('div');
+                    div.className = 'list-item';
+                    div.innerHTML = `
+                        <video src="${item.data}" style="width:100%; border-radius:8px;"></video>
+                        <button class="action-btn" onclick="startAI('${item.data}')">PAINT THIS VIDEO</button>
+                        <button style="background:none; border:none; color:red; margin-top:10px; cursor:pointer;" onclick="deleteVideo(${item.id})">Delete</button>
+                    `;
+                    list.appendChild(div);
+                });
+            }
+            showPage('storagePage');
+        }
+
+        function deleteVideo(id) {
+            let storage = JSON.parse(localStorage.getItem('hpp_videos') || '[]');
+            storage = storage.filter(item => item.id !== id);
+            localStorage.setItem('hpp_videos', JSON.stringify(storage));
+            openStoragePage();
+        }
+
+        // AI SCANNER LOGIC
+        function startAI(src) {
+            video.src = src;
+            const grid = document.getElementById('colorGrid');
+            grid.innerHTML = "";
+            colors.forEach(c => {
+                const sw = document.createElement('div');
+                sw.className = 'swatch'; sw.style.background = c.h;
+                sw.onclick = () => { selectedRGB = {r: c.r, g: c.g, b: c.b}; };
+                grid.appendChild(sw);
+            });
+
+            showPage('editPage');
+            video.play();
+            video.onloadedmetadata = () => {
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                processLoop();
+            };
+        }
+
+        function processLoop() {
+            if (video.paused || video.ended) return;
+
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
+            const data = frame.data;
+
+            for (let i = 0; i < data.length; i += 4) {
+                const r = data[i], g = data[i+1], b = data[i+2];
+
+                // AI RULE: If pixel is BRIGHT and NEUTRAL (White/Grey), change it.
+                if (r > 160 && g > 160 && b > 160 && Math.abs(r - g) < 25) {
+                    // Apply color while keeping wall shadows
+                    data[i] = (r * selectedRGB.r) / 255;
+                    data[i+1] = (g * selectedRGB.g) /
