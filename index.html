@@ -6,57 +6,26 @@
     <title>Home Paint Pro</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;700&display=swap" rel="stylesheet">
     <style>
+        /* Existing styles kept for consistency */
         * { box-sizing: border-box; }
-        body {
-            margin: 0; padding: 0;
-            font-family: 'Inter', sans-serif;
-            background: linear-gradient(rgba(12, 24, 45, 0.9), rgba(12, 24, 45, 0.9)), 
-                        url('https://images.unsplash.com/photo-1618221195710-dd6b41faaea6?q=80&w=2000') no-repeat center center fixed;
-            background-size: cover;
-            height: 100vh;
-            color: white;
-            overflow-x: hidden;
-        }
-
-        .page {
-            display: none; /* Hidden by default */
-            width: 100%;
-            max-width: 420px;
-            margin: 0 auto;
-            padding: 20px;
-            text-align: center;
-            animation: fadeIn 0.3s ease-in;
-        }
-
-        .active { display: block; } /* Show active page */
-
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-
-        /* HEADER STYLES */
+        body { margin: 0; padding: 0; font-family: 'Inter', sans-serif; background: #0c182d; color: white; overflow-x: hidden; }
+        .page { display: none; width: 100%; max-width: 420px; margin: 0 auto; padding: 20px; text-align: center; }
+        .active { display: block; }
         .home-icon { font-size: 3rem; color: #f39c12; margin-top: 40px; }
-        h1 { font-size: 2rem; margin: 10px 0; }
         .tagline { color: #bdc3c7; margin-bottom: 40px; font-weight: 300; }
-
-        /* BUTTON/CARD STYLES */
-        .card {
-            background: #fff; color: #1a1a1a;
-            border-radius: 15px; padding: 20px;
-            display: flex; align-items: center;
-            margin-bottom: 15px; cursor: pointer;
-            box-shadow: 0 10px 20px rgba(0,0,0,0.3);
-        }
-        .icon-box { font-size: 1.8rem; margin-right: 20px; width: 40px; }
-        .text-box { text-align: left; }
-        .text-box h3 { margin: 0; font-size: 1rem; text-transform: uppercase; }
-        .text-box p { margin: 2px 0 0; color: #7f8c8d; font-size: 0.8rem; }
-
-        /* PAGE CONTENT STYLES */
         .back-btn { background: none; border: 1px solid white; color: white; padding: 10px 20px; border-radius: 5px; margin-bottom: 20px; cursor: pointer; }
-        .color-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 20px; }
-        .color-swatch { height: 80px; border-radius: 10px; display: flex; align-items: flex-end; padding: 5px; font-size: 0.7rem; font-weight: bold; color: rgba(0,0,0,0.5); }
+        .card { background: #fff; color: #1a1a1a; border-radius: 15px; padding: 20px; display: flex; align-items: center; margin-bottom: 15px; cursor: pointer; }
+        .icon-box { font-size: 1.8rem; margin-right: 20px; }
+        .color-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin: 20px 0; }
+        .swatch { height: 60px; border-radius: 10px; cursor: pointer; border: 3px solid transparent; display: flex; align-items: center; justify-content: center; }
+        .swatch.selected { border-color: white; transform: scale(1.1); }
         
-        /* Uploader Styling */
-        .upload-area { border: 2px dashed #bdc3c7; padding: 40px 20px; border-radius: 15px; margin-top: 20px; }
+        /* Video & Project Styles */
+        #videoContainer { position: relative; width: 100%; border-radius: 15px; overflow: hidden; background: #000; margin-top: 20px; }
+        video { width: 100%; display: block; }
+        .overlay-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; mix-blend-mode: multiply; pointer-events: none; opacity: 0.5; }
+        .project-item { background: rgba(255,255,255,0.1); border-radius: 10px; padding: 10px; margin-bottom: 15px; text-align: left; }
+        .save-btn { width: 100%; padding: 15px; background: #3498db; border: none; color: white; border-radius: 8px; font-weight: bold; margin-top: 10px; cursor: pointer; }
     </style>
 </head>
 <body>
@@ -65,61 +34,76 @@
         <div class="home-icon">🏠</div>
         <h1>HOME PAINT PRO</h1>
         <p class="tagline">Visualize Your World, One Wall At A Time.</p>
-        
-        <div class="card" onclick="showPage('visualizePage')">
+        <div class="card" onclick="showPage('selectColorPage')">
             <div class="icon-box">📹</div>
-            <div class="text-box"><h3>Start Visualizing</h3><p>Upload a video of your room</p></div>
+            <div class="text-box"><h3>Start Visualizing</h3><p>Choose color & record room</p></div>
         </div>
-
         <div class="card" onclick="showPage('colorPage')">
             <div class="icon-box">🎨</div>
-            <div class="text-box"><h3>Browse Colors</h3><p>Explore thousands of hues</p></div>
+            <div class="text-box"><h3>Browse Colors</h3><p>View our available hues</p></div>
         </div>
-
-        <div class="card" onclick="showPage('projectsPage')">
+        <div class="card" onclick="loadProjects()">
             <div class="icon-box">📁</div>
             <div class="text-box"><h3>My Projects</h3><p>View saved designs</p></div>
         </div>
     </div>
 
-    <div id="visualizePage" class="page">
-        <button class="back-btn" onclick="showPage('menuPage')">← Back</button>
-        <h2>Upload Video</h2>
-        <p>Record or select a video of your room to begin painting.</p>
-        <div class="upload-area">
-            <input type="file" accept="video/*" capture="environment" id="videoUpload" style="display:none">
-            <button onclick="document.getElementById('videoUpload').click()" style="padding:15px; background:#f39c12; border:none; color:white; border-radius:5px; font-weight:bold;">CHOOSE VIDEO</button>
+    <div id="previewPage" class="page">
+        <button class="back-btn" onclick="showPage('menuPage')">← Home</button>
+        <h2>Preview</h2>
+        <div id="videoContainer">
+            <video id="outputVideo" controls autoplay loop muted></video>
+            <div id="colorOverlay" class="overlay-layer"></div>
         </div>
-    </div>
-
-    <div id="colorPage" class="page">
-        <button class="back-btn" onclick="showPage('menuPage')">← Back</button>
-        <h2>Trending Hues</h2>
-        <div class="color-grid">
-            <div class="color-swatch" style="background:#E74C3C;">#E74C3C</div>
-            <div class="color-swatch" style="background:#3498DB;">#3498DB</div>
-            <div class="color-swatch" style="background:#F1C40F;">#F1C40F</div>
-            <div class="color-swatch" style="background:#2ECC71;">#2ECC71</div>
-            <div class="color-swatch" style="background:#9B59B6;">#9B59B6</div>
-            <div class="color-swatch" style="background:#ECF0F1;">#ECF0F1</div>
-        </div>
+        <button class="save-btn" onclick="saveCurrentProject()">💾 SAVE TO PROJECTS</button>
     </div>
 
     <div id="projectsPage" class="page">
         <button class="back-btn" onclick="showPage('menuPage')">← Back</button>
-        <h2>My Projects</h2>
-        <p style="margin-top:50px; opacity:0.6;">You haven't saved any designs yet.</p>
+        <h2>My Saved Projects</h2>
+        <div id="projectList"></div>
     </div>
 
     <script>
-        function showPage(pageId) {
-            // Hide all pages
-            document.querySelectorAll('.page').forEach(page => {
-                page.classList.remove('active');
-            });
-            // Show requested page
-            document.getElementById(pageId).classList.add('active');
+        let currentVideoBlob = null;
+        let selectedColor = "";
+
+        // Function to save the video and color
+        function saveCurrentProject() {
+            if (!currentVideoBlob || !selectedColor) return;
+
+            const reader = new FileReader();
+            reader.readAsDataURL(currentVideoBlob); 
+            reader.onloadend = function() {
+                const base64Video = reader.result;
+                const project = {
+                    id: Date.now(),
+                    video: base64Video,
+                    color: selectedColor,
+                    date: new Date().toLocaleDateString()
+                };
+
+                let projects = JSON.parse(localStorage.getItem('paintProjects') || '[]');
+                projects.push(project);
+                localStorage.setItem('paintProjects', JSON.stringify(projects));
+                alert("Project Saved Successfully!");
+                showPage('menuPage');
+            }
         }
-    </script>
-</body>
-</html>
+
+        // Function to display saved projects
+        function loadProjects() {
+            const list = document.getElementById('projectList');
+            list.innerHTML = '';
+            const projects = JSON.parse(localStorage.getItem('paintProjects') || '[]');
+
+            if (projects.length === 0) {
+                list.innerHTML = '<p style="opacity:0.5; margin-top:50px;">No projects saved yet.</p>';
+            } else {
+                projects.forEach(p => {
+                    const item = document.createElement('div');
+                    item.className = 'project-item';
+                    item.innerHTML = `
+                        <p><strong>Project: ${p.date}</strong></p>
+                        <div style="position:relative; border-radius:8px; overflow:hidden;">
+                            <video src="${p.video}" style="width:100%" muted
