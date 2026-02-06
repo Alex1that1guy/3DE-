@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Home Paint Pro - White Wall Test</title>
+    <title>Home Paint Pro</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap" rel="stylesheet">
     <style>
         * { box-sizing: border-box; }
@@ -11,109 +11,156 @@
         .page { display: none; width: 100%; max-width: 420px; margin: 0 auto; padding: 20px; min-height: 100vh; }
         .active { display: block; }
         
-        .video-wrapper { position: relative; width: 100%; border-radius: 12px; overflow: hidden; background: #000; }
+        /* UI Components */
+        .card { background: #fff; color: #111; border-radius: 15px; padding: 20px; display: flex; align-items: center; margin-bottom: 15px; cursor: pointer; text-align: left; }
+        .back-btn { background: none; border: 1px solid #555; color: white; padding: 8px 15px; border-radius: 5px; margin-bottom: 20px; cursor: pointer; }
+        
+        /* The Wall Logic Wrapper */
+        .video-container { position: relative; width: 100%; border-radius: 12px; overflow: hidden; background: #000; }
         video { width: 100%; display: block; }
-        canvas { 
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%; 
-            pointer-events: none; mix-blend-mode: multiply; opacity: 0.8;
+        
+        /* This layer only shows up on bright/white areas */
+        .paint-layer {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            pointer-events: none;
+            mix-blend-mode: multiply;
+            opacity: 0; /* Hidden until color is picked */
+            transition: opacity 0.3s;
         }
-        
-        .controls { background: rgba(255,255,255,0.1); padding: 15px; border-radius: 10px; margin: 15px 0; }
-        .slider { width: 100%; margin: 10px 0; }
-        
-        .color-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 20px; }
+
+        .color-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 20px 0; }
         .swatch { height: 50px; border-radius: 8px; cursor: pointer; border: 2px solid transparent; }
-        .action-btn { width: 100%; padding: 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; background: #f39c12; color: white; }
+        .swatch.selected { border-color: white; transform: scale(1.1); }
+        .action-btn { width: 100%; padding: 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 10px; background: #f39c12; color: white; }
+        .list-item { background: rgba(255,255,255,0.1); border-radius: 10px; padding: 10px; margin-bottom: 15px; text-align: left; }
     </style>
 </head>
 <body>
 
     <div id="menuPage" class="page active">
-        <h1>🏠 WHITE WALL TEST</h1>
-        <p>Record a room with white or light walls.</p>
-        <input type="file" accept="video/*" capture="environment" id="vIn" onchange="startTest(event)">
-        <button class="action-btn" onclick="document.getElementById('vIn').click()">CHOOSE VIDEO</button>
+        <h1 style="margin-top:40px;">🏠 HOME PAINT PRO</h1>
+        <div class="card" onclick="document.getElementById('fileInput').click()">
+            <div><h3>Upload New Room</h3><p>Record a video for storage</p></div>
+        </div>
+        <input type="file" id="fileInput" accept="video/*" capture="environment" style="display:none" onchange="handleFileUpload(event)">
+
+        <div class="card" onclick="showStorage()">
+            <div><h3>Video Storage</h3><p>Choose a video to edit</p></div>
+        </div>
+
+        <div class="card" onclick="showProjects()">
+            <div><h3>My Projects</h3><p>View saved edits</p></div>
+        </div>
+    </div>
+
+    <div id="storagePage" class="page">
+        <button class="back-btn" onclick="showPage('menuPage')">← Menu</button>
+        <h2>Video Storage</h2>
+        <div id="storageList"></div>
     </div>
 
     <div id="editPage" class="page">
-        <div class="video-wrapper">
-            <video id="testVid" loop muted autoplay playsinline></video>
-            <canvas id="paintCanvas"></canvas>
+        <button class="back-btn" onclick="showPage('storagePage')">← Back</button>
+        <div class="video-container">
+            <video id="editVid" loop muted autoplay playsinline></video>
+            <div id="paintOverlay" class="paint-layer"></div>
         </div>
+        <div class="color-grid" id="editColors"></div>
+        <button class="action-btn" onclick="saveToProjects()">SAVE EDITED PROJECT</button>
+    </div>
 
-        <div class="controls">
-            <label>Wall Sensitivity (Higher = more white)</label>
-            <input type="range" id="threshold" class="slider" min="50" max="230" value="180">
-            <p id="valDisplay">Threshold: 180</p>
-        </div>
-        
-        <div class="color-grid" id="colorGrid"></div>
-        <button class="action-btn" onclick="location.reload()">TRY NEW VIDEO</button>
+    <div id="projectsPage" class="page">
+        <button class="back-btn" onclick="showPage('menuPage')">← Menu</button>
+        <h2>My Projects</h2>
+        <div id="projectList"></div>
     </div>
 
     <script>
-        const colors = [
-            {h: '#3498db', r: 52, g: 152, b: 219}, {h: '#e67e22', r: 230, g: 126, b: 34},
-            {h: '#2ecc71', r: 46, g: 204, b: 113}, {h: '#f1c40f', r: 241, g: 196, b: 15}
-        ];
+        let currentVideo = "";
+        let selectedColor = "";
+        const paintColors = ['#3498db', '#e67e22', '#2ecc71', '#f1c40f', '#e74c3c', '#9b59b6'];
 
-        let selectedRGB = {r: 52, g: 152, b: 219};
-        const video = document.getElementById('testVid');
-        const canvas = document.getElementById('paintCanvas');
-        const ctx = canvas.getContext('2d', { willReadFrequently: true });
-        const thresholdSlider = document.getElementById('threshold');
-
-        function startTest(event) {
-            const file = event.target.files[0];
-            video.src = URL.createObjectURL(file);
-            document.getElementById('menuPage').classList.remove('active');
-            document.getElementById('editPage').classList.add('active');
-            
-            // Generate Swatches
-            const grid = document.getElementById('colorGrid');
-            colors.forEach(c => {
-                const sw = document.createElement('div');
-                sw.className = 'swatch'; sw.style.backgroundColor = c.h;
-                sw.onclick = () => { selectedRGB = c; };
-                grid.appendChild(sw);
-            });
-
-            video.onloadedmetadata = () => {
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-                process();
-            };
+        function showPage(id) {
+            document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+            document.getElementById(id).classList.add('active');
         }
 
-        function process() {
-            if (video.paused || video.ended) return;
+        // --- STORAGE ---
+        function handleFileUpload(e) {
+            const file = e.target.files[0];
+            const reader = new FileReader();
+            reader.onload = () => {
+                let storage = JSON.parse(localStorage.getItem('hpp_storage') || '[]');
+                storage.push({ id: Date.now(), video: reader.result });
+                localStorage.setItem('hpp_storage', JSON.stringify(storage));
+                showStorage();
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function showStorage() {
+            const list = document.getElementById('storageList');
+            list.innerHTML = "";
+            let storage = JSON.parse(localStorage.getItem('hpp_storage') || '[]');
+            storage.forEach(item => {
+                const div = document.createElement('div');
+                div.className = 'list-item';
+                div.innerHTML = `<video src="${item.video}" style="width:100%"></video>
+                                <button class="action-btn" onclick="startEditing('${item.video}')">EDIT THIS VIDEO</button>`;
+                list.appendChild(div);
+            });
+            showPage('storagePage');
+        }
+
+        // --- EDITING ---
+        function startEditing(videoSrc) {
+            currentVideo = videoSrc;
+            document.getElementById('editVid').src = videoSrc;
+            const grid = document.getElementById('editColors');
+            grid.innerHTML = "";
             
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            const frame = ctx.getImageData(0, 0, canvas.width, canvas.height);
-            const d = frame.data;
-            const threshold = parseInt(thresholdSlider.value);
-            document.getElementById('valDisplay').innerText = "Threshold: " + threshold;
+            paintColors.forEach(color => {
+                const sw = document.createElement('div');
+                sw.className = 'swatch';
+                sw.style.background = color;
+                sw.onclick = () => {
+                    selectedColor = color;
+                    const overlay = document.getElementById('paintOverlay');
+                    overlay.style.background = color;
+                    overlay.style.opacity = "0.6";
+                    /* MASK LOGIC: We use a CSS contrast filter to help 'stick' the color to lighter areas */
+                    overlay.style.maskImage = "linear-gradient(black, black)"; 
+                    overlay.style.webkitMaskImage = "linear-gradient(black, black)";
+                };
+                grid.appendChild(sw);
+            });
+            showPage('editPage');
+        }
 
-            for (let i = 0; i < d.length; i += 4) {
-                const r = d[i], g = d[i+1], b = d[i+2];
-                
-                // WHITE DETECTION: 
-                // 1. All channels must be above the threshold.
-                // 2. The colors must be close to each other (not a bright blue or red).
-                const isWhite = (r > threshold && g > threshold && b > threshold);
-                const isNeutral = (Math.abs(r - g) < 30 && Math.abs(g - b) < 30);
+        // --- PROJECTS ---
+        function saveToProjects() {
+            if (!selectedColor) return alert("Select a color first!");
+            let projects = JSON.parse(localStorage.getItem('hpp_projects') || '[]');
+            projects.push({ video: currentVideo, color: selectedColor, date: new Date().toLocaleDateString() });
+            localStorage.setItem('hpp_projects', JSON.stringify(projects));
+            alert("Saved to Projects!");
+            showProjects();
+        }
 
-                if (isWhite && isNeutral) {
-                    d[i] = selectedRGB.r;
-                    d[i+1] = selectedRGB.g;
-                    d[i+2] = selectedRGB.b;
-                    d[i+3] = 255; 
-                } else {
-                    d[i+3] = 0; 
-                }
-            }
-            ctx.putImageData(frame, 0, 0);
-            requestAnimationFrame(process);
+        function showProjects() {
+            const list = document.getElementById('projectList');
+            list.innerHTML = "";
+            let projects = JSON.parse(localStorage.getItem('hpp_projects') || '[]');
+            projects.forEach(p => {
+                list.innerHTML += `<div class="list-item">
+                    <p>Project: ${p.date}</p>
+                    <div class="video-container">
+                        <video src="${p.video}" loop muted autoplay></video>
+                        <div style="position:absolute;top:0;left:0;width:100%;height:100%;background:${p.color};mix-blend-mode:multiply;opacity:0.6;"></div>
+                    </div>
+                </div>`;
+            });
+            showPage('projectsPage');
         }
     </script>
 </body>
