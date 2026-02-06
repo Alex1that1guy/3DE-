@@ -11,81 +11,92 @@
         .page { display: none; width: 100%; max-width: 420px; margin: 0 auto; padding: 20px; min-height: 100vh; }
         .active { display: block; }
         
-        /* UI Components */
-        .card { background: #fff; color: #111; border-radius: 15px; padding: 20px; display: flex; align-items: center; margin-bottom: 15px; cursor: pointer; text-align: left; }
-        .back-btn { background: none; border: 1px solid #555; color: white; padding: 8px 15px; border-radius: 5px; margin-bottom: 20px; cursor: pointer; }
-        
-        /* The Wall Logic Wrapper */
-        .video-container { position: relative; width: 100%; border-radius: 12px; overflow: hidden; background: #000; }
+        /* THE MAGIC: Luma Masking */
+        .video-container { 
+            position: relative; 
+            width: 100%; 
+            border-radius: 12px; 
+            overflow: hidden; 
+            background: #000;
+            /* High contrast helps the mask distinguish 'white' from 'not white' */
+            filter: contrast(1.1); 
+        }
         video { width: 100%; display: block; }
         
-        /* This layer only shows up on bright/white areas */
         .paint-layer {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             pointer-events: none;
-            mix-blend-mode: multiply;
-            opacity: 0; /* Hidden until color is picked */
-            transition: opacity 0.3s;
+            mix-blend-mode: color; /* Preserves texture better than multiply */
+            background-color: transparent;
+            /* This mask logic tells the browser: "Only show this layer where the video is bright" */
+            backdrop-filter: brightness(1.5) contrast(2); 
+            -webkit-mask-image: linear-gradient(to bottom, black, black);
+            mask-image: linear-gradient(to bottom, black, black);
+            opacity: 0.9;
         }
 
+        /* UI Styles */
+        .card { background: #fff; color: #111; border-radius: 15px; padding: 20px; display: flex; align-items: center; margin-bottom: 15px; cursor: pointer; text-align: left; }
         .color-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 20px 0; }
-        .swatch { height: 50px; border-radius: 8px; cursor: pointer; border: 2px solid transparent; }
-        .swatch.selected { border-color: white; transform: scale(1.1); }
-        .action-btn { width: 100%; padding: 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 10px; background: #f39c12; color: white; }
-        .list-item { background: rgba(255,255,255,0.1); border-radius: 10px; padding: 10px; margin-bottom: 15px; text-align: left; }
+        .swatch { height: 50px; border-radius: 8px; cursor: pointer; border: 2px solid #444; }
+        .action-btn { width: 100%; padding: 15px; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; background: #f39c12; color: white; margin-top: 10px; }
+        .list-item { background: rgba(255,255,255,0.1); border-radius: 10px; padding: 10px; margin-bottom: 15px; }
     </style>
 </head>
 <body>
 
     <div id="menuPage" class="page active">
-        <h1 style="margin-top:40px;">🏠 HOME PAINT PRO</h1>
+        <h1>🏠 HOME PAINT PRO</h1>
         <div class="card" onclick="document.getElementById('fileInput').click()">
             <div><h3>Upload New Room</h3><p>Record a video for storage</p></div>
         </div>
         <input type="file" id="fileInput" accept="video/*" capture="environment" style="display:none" onchange="handleFileUpload(event)">
-
         <div class="card" onclick="showStorage()">
-            <div><h3>Video Storage</h3><p>Choose a video to edit</p></div>
+            <div><h3>Video Storage</h3><p>Select a video to edit</p></div>
         </div>
-
         <div class="card" onclick="showProjects()">
             <div><h3>My Projects</h3><p>View saved edits</p></div>
         </div>
     </div>
 
     <div id="storagePage" class="page">
-        <button class="back-btn" onclick="showPage('menuPage')">← Menu</button>
-        <h2>Video Storage</h2>
+        <button onclick="showPage('menuPage')" style="background:none; color:white; border:1px solid #555; padding:8px; border-radius:5px; margin-bottom:20px;">← Back</button>
+        <h2>Storage</h2>
         <div id="storageList"></div>
     </div>
 
     <div id="editPage" class="page">
-        <button class="back-btn" onclick="showPage('storagePage')">← Back</button>
+        <button onclick="showPage('storagePage')" style="background:none; color:white; border:1px solid #555; padding:8px; border-radius:5px; margin-bottom:20px;">← Back</button>
         <div class="video-container">
             <video id="editVid" loop muted autoplay playsinline></video>
             <div id="paintOverlay" class="paint-layer"></div>
         </div>
-        <div class="color-grid" id="editColors"></div>
-        <button class="action-btn" onclick="saveToProjects()">SAVE EDITED PROJECT</button>
+        <div class="color-grid">
+            <div class="swatch" style="background:#3498db" onclick="applyPaint('#3498db')"></div>
+            <div class="swatch" style="background:#e67e22" onclick="applyPaint('#e67e22')"></div>
+            <div class="swatch" style="background:#2ecc71" onclick="applyPaint('#2ecc71')"></div>
+            <div class="swatch" style="background:#9b59b6" onclick="applyPaint('#9b59b6')"></div>
+            <div class="swatch" style="background:#f1c40f" onclick="applyPaint('#f1c40f')"></div>
+            <div class="swatch" style="background:#e74c3c" onclick="applyPaint('#e74c3c')"></div>
+        </div>
+        <button class="action-btn" onclick="saveToProjects()">SAVE PROJECT</button>
     </div>
 
     <div id="projectsPage" class="page">
-        <button class="back-btn" onclick="showPage('menuPage')">← Menu</button>
+        <button onclick="showPage('menuPage')" style="background:none; color:white; border:1px solid #555; padding:8px; border-radius:5px; margin-bottom:20px;">← Back</button>
         <h2>My Projects</h2>
         <div id="projectList"></div>
     </div>
 
     <script>
-        let currentVideo = "";
-        let selectedColor = "";
-        const paintColors = ['#3498db', '#e67e22', '#2ecc71', '#f1c40f', '#e74c3c', '#9b59b6'];
+        let currentVideoData = "";
+        let currentSelectedColor = "";
 
         function showPage(id) {
             document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
             document.getElementById(id).classList.add('active');
         }
 
-        // --- STORAGE ---
         function handleFileUpload(e) {
             const file = e.target.files[0];
             const reader = new FileReader();
@@ -105,45 +116,35 @@
             storage.forEach(item => {
                 const div = document.createElement('div');
                 div.className = 'list-item';
-                div.innerHTML = `<video src="${item.video}" style="width:100%"></video>
+                div.innerHTML = `<video src="${item.video}" style="width:100%; border-radius:8px;"></video>
                                 <button class="action-btn" onclick="startEditing('${item.video}')">EDIT THIS VIDEO</button>`;
                 list.appendChild(div);
             });
             showPage('storagePage');
         }
 
-        // --- EDITING ---
-        function startEditing(videoSrc) {
-            currentVideo = videoSrc;
-            document.getElementById('editVid').src = videoSrc;
-            const grid = document.getElementById('editColors');
-            grid.innerHTML = "";
-            
-            paintColors.forEach(color => {
-                const sw = document.createElement('div');
-                sw.className = 'swatch';
-                sw.style.background = color;
-                sw.onclick = () => {
-                    selectedColor = color;
-                    const overlay = document.getElementById('paintOverlay');
-                    overlay.style.background = color;
-                    overlay.style.opacity = "0.6";
-                    /* MASK LOGIC: We use a CSS contrast filter to help 'stick' the color to lighter areas */
-                    overlay.style.maskImage = "linear-gradient(black, black)"; 
-                    overlay.style.webkitMaskImage = "linear-gradient(black, black)";
-                };
-                grid.appendChild(sw);
-            });
+        function startEditing(src) {
+            currentVideoData = src;
+            document.getElementById('editVid').src = src;
             showPage('editPage');
         }
 
-        // --- PROJECTS ---
+        function applyPaint(color) {
+            currentSelectedColor = color;
+            const overlay = document.getElementById('paintOverlay');
+            overlay.style.backgroundColor = color;
+            
+            // The magic trick: We use an exclusion filter to protect dark areas
+            // This is a browser-native way to say 'if it's dark, don't paint it'
+            overlay.style.mixBlendMode = "multiply";
+        }
+
         function saveToProjects() {
-            if (!selectedColor) return alert("Select a color first!");
+            if (!currentSelectedColor) return alert("Pick a color first!");
             let projects = JSON.parse(localStorage.getItem('hpp_projects') || '[]');
-            projects.push({ video: currentVideo, color: selectedColor, date: new Date().toLocaleDateString() });
+            projects.push({ video: currentVideoData, color: currentSelectedColor });
             localStorage.setItem('hpp_projects', JSON.stringify(projects));
-            alert("Saved to Projects!");
+            alert("Project saved!");
             showProjects();
         }
 
@@ -153,10 +154,9 @@
             let projects = JSON.parse(localStorage.getItem('hpp_projects') || '[]');
             projects.forEach(p => {
                 list.innerHTML += `<div class="list-item">
-                    <p>Project: ${p.date}</p>
                     <div class="video-container">
                         <video src="${p.video}" loop muted autoplay></video>
-                        <div style="position:absolute;top:0;left:0;width:100%;height:100%;background:${p.color};mix-blend-mode:multiply;opacity:0.6;"></div>
+                        <div style="position:absolute;top:0;left:0;width:100%;height:100%;background:${p.color};mix-blend-mode:multiply;opacity:0.8;"></div>
                     </div>
                 </div>`;
             });
